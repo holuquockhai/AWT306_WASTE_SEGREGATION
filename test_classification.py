@@ -1,88 +1,73 @@
-import cv2
-import numpy as np
-import tflite_runtime.interpreter as tflite
 import time
-
-# Path to your TensorFlow Lite model
-MODEL_PATH = "model.tflite"
-
-# Classes (update these with your waste categories)
-CLASSES = ['Plastic', 'Paper', 'Metal', 'Organic']
+import numpy as np
+import cv2
+import tensorflow as tf
+from picamera2 import Picamera2
 
 # Load the TensorFlow Lite model
-interpreter = tflite.Interpreter(model_path=MODEL_PATH)
+MODEL_PATH = "waste_classifier.tflite"  # Path to your TFLite file
+LABELS = ['glass', 'metal', 'paper', 'plastic']  # Modify based on your classes
+interpreter = tf.lite.Interpreter(model_path=MODEL_PATH)
 interpreter.allocate_tensors()
 
-# Get input and output details of the model
+# Get input and output tensor details
 input_details = interpreter.get_input_details()
 output_details = interpreter.get_output_details()
 
-# Function to preprocess the input image
-def preprocess_image(image, input_shape):
-    # Resize the image to the model's expected input size
-    img = cv2.resize(image, (input_shape[1], input_shape[2]))
-    # Normalize pixel values to [0, 1]
-    img = img.astype(np.float32) / 255.0
-    # Add batch dimension
-    img = np.expand_dims(img, axis=0)
-    return img
+# Initialize the Picamera2
+picam2 = Picamera2()
+camera_config = picam2.create_preview_configuration(main={"size": (640, 480), "format": "RGB888"})
+picam2.configure(camera_config)
+picam2.start()
 
-# Function to classify the image
-def classify_image(image):
-    # Preprocess the image
+# Function to preprocess the image
+def preprocess_image(frame, input_shape):
+    image = cv2.resize(frame, (input_shape[1], input_shape[2]))  # Resize to model input size
+    image = np.expand_dims(image, axis=0)  # Add batch dimension
+    image = image / 255.0  # Normalize to [0, 1]
+    return image.astype(np.float32)
+
+# Function to perform inference and get predictions
+def predict(image):
     input_shape = input_details[0]['shape']
-    input_data = preprocess_image(image, input_shape)
-
-    # Set the input tensor
-    interpreter.set_tensor(input_details[0]['index'], input_data)
-
-    # Run inference
-    start_time = time.time()
+    preprocessed_image = preprocess_image(image, input_shape)
+    interpreter.set_tensor(input_details[0]['index'], preprocessed_image)
     interpreter.invoke()
-    end_time = time.time()
+    predictions = interpreter.get_tensor(output_details[0]['index'])[0]  # Get the prediction
+    return predictions
 
-    # Get the output tensor
-    output_data = interpreter.get_tensor(output_details[0]['index'])
-    class_index = np.argmax(output_data)
-    confidence = output_data[0][class_index]
+# Main loop for real-time image classification
+try:
+    while True:
+        # Capture frame from the camera
+        frame = picam2.capture_array()
 
-    # Display classification results
-    print(f"Class: {CLASSES[class_index]} | Confidence: {confidence:.2f} | Time: {end_time - start_time:.3f}s")
-    return CLASSES[class_index], confidence
+        image = cv2.flip(frame, 1)
 
-# Initialize the camera
-camera = cv2.VideoCapture(0)
+        # Convert the image from BGR to RGB as required by the TFLite model.
+        rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-if not camera.isOpened():
-    print("Error: Could not access the camera.")
-    exit()
+        # Perform inference
+        predictions = predict(rgb_image)
+        max_index = np.argmax(predictions)
+        class_name = LABELS[max_index]
+        confidence = predictions[max_index] * 100
 
-print("Starting real-time image classification. Press 'q' to quit.")
+        # Overlay prediction on the camera feed
+        text = f"{class_name}: {confidence:.2f}%"
+        cv2.putText(frame, text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
-while True:
-    # Capture a frame from the camera
-    ret, frame = camera.read()
-    if not ret:
-        print("Error: Could not read frame.")
-        break
+        # Display the frame with prediction
+        cv2.imshow("Waste Classification", frame)
 
-    # Display the frame
-    cv2.imshow("Camera Feed", frame)
+        # Exit on pressing 'q'
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
 
-    # Perform classification
-    waste_type, confidence = classify_image(frame)
+except KeyboardInterrupt:
+    print("Stopped by User")
 
-    # Add classification result on the frame
-    cv2.putText(frame, f"{waste_type} ({confidence:.2f})", (10, 30),
-                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-
-    # Show the frame with the classification result
-    cv2.imshow("Classified Frame", frame)
-
-    # Quit when 'q' is pressed
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-# Release the camera and close all OpenCV windows
-camera.release()
-cv2.destroyAllWindows()
+finally:
+    # Cleanup
+    picam2.stop()
+    cv2.destroyAllWindows()
