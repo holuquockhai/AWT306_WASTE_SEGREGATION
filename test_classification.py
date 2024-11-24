@@ -12,6 +12,8 @@ interpreter.allocate_tensors()
 
 # Get input and output tensor details
 input_details = interpreter.get_input_details()
+print output
+
 output_details = interpreter.get_output_details()
 
 # Initialize the Picamera2
