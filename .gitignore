@@ -1,1 +1,6 @@
 .DS_Store
+#exclude virtual environment folder
+venv/*
+
+#exclude dataset folder
+dataset/*
