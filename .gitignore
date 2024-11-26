@@ -6,3 +6,4 @@ venv/*
 dataset/*
 
 __MACOSX/*
+.ipynb_checkpoints/*
