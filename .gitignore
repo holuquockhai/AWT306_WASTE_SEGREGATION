@@ -4,3 +4,5 @@ venv/*
 
 #exclude dataset folder
 dataset/*
+
+__MACOSX/*
