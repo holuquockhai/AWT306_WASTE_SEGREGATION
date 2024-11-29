@@ -37,7 +37,7 @@ def preprocess_image(frame, input_shape):
 def predict(image):
 	input_shape = input_details[0]['shape']
 	preprocessed_image = preprocess_image(image, input_shape)
-	predictions_lite = classify_lite(keras_tensor_390=preprocessed_image)['output_0']
+	predictions_lite = classify_lite(keras_tensor_5663=preprocessed_image)['output_0']
 	score_lite = tf.nn.softmax(predictions_lite)
 	return score_lite
 
@@ -47,16 +47,16 @@ try:
 		# Capture frame from the camera
 		frame = picam2.capture_array()
 
-		image = cv2.flip(frame, 1)
+		#image = cv2.flip(frame, 1)
 
 		# Convert the image from BGR to RGB as required by the TFLite model.
-		rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+		#rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
 		# Perform inference
-		predictions = predict(rgb_image)
+		predictions = predict(frame)
 		class_name = LABELS[np.argmax(predictions)]
 		confidence = 100 * np.max(predictions)
-		if confidence >= 70:
+		if confidence >= 50:
 			# Overlay prediction on the camera feed
 			text = f"{class_name}: {confidence:.2f}%"
 		else:
