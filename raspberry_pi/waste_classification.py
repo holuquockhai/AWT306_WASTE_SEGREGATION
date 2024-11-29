@@ -56,7 +56,7 @@ try:
 		predictions = predict(rgb_image)
 		class_name = LABELS[np.argmax(predictions)]
 		confidence = 100 * np.max(predictions)
-		if confidence >= 50:
+		if confidence >= 70:
 			# Overlay prediction on the camera feed
 			text = f"{class_name}: {confidence:.2f}%"
 		else:
