@@ -8,3 +8,4 @@ dataset/*
 __MACOSX/*
 .ipynb_checkpoints/*
 model_export/*
+MobileNetSearch/*
